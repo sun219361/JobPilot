@@ -1,0 +1,91 @@
+# .gitignore for Job Briefing Service
+
+# ──────────────────────────
+# Python / Backend
+# ──────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Environment variables
+.env
+.env.local
+.env.production
+.env.staging
+*.env
+
+# Alembic
+# (versions 폴더는 추적, 로컬 DB 상태는 제외)
+
+# ──────────────────────────
+# Node.js / Frontend
+# ──────────────────────────
+node_modules/
+.next/
+out/
+.nuxt/
+dist/
+
+# Environment variables (frontend)
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ──────────────────────────
+# Database
+# ──────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ──────────────────────────
+# Logs
+# ──────────────────────────
+*.log
+logs/
+batch/logs/
+
+# ──────────────────────────
+# Docker
+# ──────────────────────────
+# docker-compose.override.yml은 로컬 오버라이드용이므로 제외
+docker-compose.override.yml
+
+# ──────────────────────────
+# IDE / Editor
+# ──────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ──────────────────────────
+# Testing
+# ──────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# ──────────────────────────
+# Secrets (절대 커밋 금지)
+# ──────────────────────────
+*.pem
+*.key
+*.cert
+secrets/

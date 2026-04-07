@@ -1,0 +1,95 @@
+// ─────────────────────────────────────────────
+// Domain Types
+// ─────────────────────────────────────────────
+
+export type CompanyType = "LARGE" | "MID" | "PUBLIC";
+export type SourceType = "news" | "job" | "notice";
+
+export interface Company {
+  id: number;
+  name: string;
+  company_type: CompanyType;
+  industry: string;
+  summary: string;
+  homepage_url?: string | null;
+  careers_url?: string | null;
+  is_active: boolean;
+}
+
+export interface PrepSnapshot {
+  id: number;
+  one_line_summary: string;
+  recent_issue_summary: string;
+  hiring_summary: string;
+  talent_summary: string;
+  cover_letter_points: string[];
+  interview_points: string[];
+  generated_at: string; // ISO 8601
+}
+
+export interface CompanyDetail extends Company {
+  latest_prep_snapshot: PrepSnapshot | null;
+}
+
+export interface Subscription {
+  id: number;
+  company: Company;
+  memo: string | null;
+  created_at: string;
+}
+
+export interface SubscriptionCreateInput {
+  company_id: number;
+  memo?: string;
+}
+
+export interface Briefing {
+  id: number;
+  briefing_date: string; // YYYY-MM-DD
+  title: string;
+  created_at: string;
+}
+
+export interface BriefingItem {
+  id: number;
+  company_id: number | null;
+  company_name: string | null;
+  source_type: SourceType;
+  headline: string;
+  summary: string;
+  action_point: string | null;
+  sort_order: number;
+}
+
+export interface TodayBriefingResponse {
+  briefing: Briefing | null;
+  items: BriefingItem[];
+}
+
+// ─────────────────────────────────────────────
+// API Response Wrapper Types
+// ─────────────────────────────────────────────
+
+export interface ApiError {
+  code: string;
+  message: string;
+  limit?: number;
+  current?: number;
+}
+
+export interface ApiResponse<T> {
+  success: boolean;
+  data: T | null;
+  error: ApiError | null;
+}
+
+export interface PaginationMeta {
+  limit: number;
+  offset: number;
+  total: number;
+}
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  pagination: PaginationMeta;
+}

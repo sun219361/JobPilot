@@ -1,26 +1,16 @@
+import { API_CONFIG } from "./config";
+import { http, ApiError } from "./http";
 import type { Subscription, SubscriptionCreateInput } from "@/lib/types";
-import { MOCK_SUBSCRIPTIONS } from "@/lib/mock/subscriptions";
-import { MOCK_COMPANIES } from "@/lib/mock/companies";
+import {
+  mockSubscriptionClient,
+  type SubscriptionClientInterface,
+  SubscriptionLimitError as MockLimitError,
+  DuplicateSubscriptionError as MockDuplicateError,
+  CompanyNotFoundError as MockNotFoundError,
+} from "./mock/subscription-client";
 
 // ─────────────────────────────────────────────
-// In-memory store (mock 전용 — 새로고침 시 초기화)
-// ─────────────────────────────────────────────
-
-let _store: Subscription[] = [...MOCK_SUBSCRIPTIONS];
-let _nextId = 100;
-
-// ─────────────────────────────────────────────
-// Interface
-// ─────────────────────────────────────────────
-
-export interface SubscriptionClientInterface {
-  getList(): Promise<Subscription[]>;
-  create(input: SubscriptionCreateInput): Promise<Subscription>;
-  delete(subscriptionId: number): Promise<void>;
-}
-
-// ─────────────────────────────────────────────
-// Error types
+// Error Classes (백엔드 응답 → 프론트 에러 변환)
 // ─────────────────────────────────────────────
 
 export class SubscriptionLimitError extends Error {
@@ -45,84 +35,54 @@ export class CompanyNotFoundError extends Error {
 }
 
 // ─────────────────────────────────────────────
-// Mock Client
+// Real API Client
 // ─────────────────────────────────────────────
 
-const SUBSCRIPTION_LIMIT = 5;
-
-const mockSubscriptionClient: SubscriptionClientInterface = {
+const realSubscriptionClient: SubscriptionClientInterface = {
   async getList() {
-    await delay(300);
-    return [..._store].sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
+    const data = await http.get<{ items: Subscription[] }>("/api/v1/subscriptions");
+    return data.items;
   },
 
-  async create({ company_id, memo }) {
-    await delay(300);
-
-    const company = MOCK_COMPANIES.find((c) => c.id === company_id && c.is_active);
-    if (!company) throw new CompanyNotFoundError();
-
-    if (_store.some((s) => s.company.id === company_id)) {
-      throw new DuplicateSubscriptionError();
+  async create(input) {
+    try {
+      return await http.post<Subscription>("/api/v1/subscriptions", input);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        // 백엔드 에러 코드를 프론트 에러로 변환
+        if (err.code === "SUBSCRIPTION_LIMIT_EXCEEDED") {
+          const { limit = 5, current = 0 } = err.details || {};
+          throw new SubscriptionLimitError(Number(limit), Number(current));
+        }
+        if (err.code === "DUPLICATE_SUBSCRIPTION") {
+          throw new DuplicateSubscriptionError();
+        }
+        if (err.code === "COMPANY_NOT_FOUND") {
+          throw new CompanyNotFoundError();
+        }
+      }
+      throw err;
     }
-
-    if (_store.length >= SUBSCRIPTION_LIMIT) {
-      throw new SubscriptionLimitError(SUBSCRIPTION_LIMIT, _store.length);
-    }
-
-    const newSub: Subscription = {
-      id: _nextId++,
-      company,
-      memo: memo ?? null,
-      created_at: new Date().toISOString(),
-    };
-    _store = [newSub, ..._store];
-    return newSub;
   },
 
   async delete(subscriptionId) {
-    await delay(200);
-    _store = _store.filter((s) => s.id !== subscriptionId);
+    await http.delete(`/api/v1/subscriptions/${subscriptionId}`);
   },
 };
 
 // ─────────────────────────────────────────────
-// Real API Client (백엔드 연결 시 교체)
+// Export: mock/real 자동 선택
 // ─────────────────────────────────────────────
 
-// const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-//
-// const realSubscriptionClient: SubscriptionClientInterface = {
-//   async getList() {
-//     const res = await fetch(`${API_BASE}/api/v1/subscriptions`);
-//     const json = await res.json();
-//     return json.data.items;
-//   },
-//   async create(input) {
-//     const res = await fetch(`${API_BASE}/api/v1/subscriptions`, {
-//       method: "POST",
-//       headers: { "Content-Type": "application/json" },
-//       body: JSON.stringify(input),
-//     });
-//     const json = await res.json();
-//     if (!json.success) throw new Error(json.error?.message);
-//     return json.data;
-//   },
-//   async delete(subscriptionId) {
-//     await fetch(`${API_BASE}/api/v1/subscriptions/${subscriptionId}`, {
-//       method: "DELETE",
-//     });
-//   },
-// };
+export const subscriptionClient: SubscriptionClientInterface = API_CONFIG.USE_MOCK
+  ? mockSubscriptionClient
+  : realSubscriptionClient;
 
-// ─────────────────────────────────────────────
-// Export
-// ─────────────────────────────────────────────
+// Mock 에러도 export (타입 체크용)
+export {
+  MockLimitError,
+  MockDuplicateError,
+  MockNotFoundError,
+};
 
-export const subscriptionClient: SubscriptionClientInterface = mockSubscriptionClient;
-
-function delay(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+export type { SubscriptionClientInterface };

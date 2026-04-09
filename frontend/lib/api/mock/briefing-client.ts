@@ -1,27 +1,25 @@
-import { API_CONFIG } from "./config";
-import { http } from "./http";
 import type { TodayBriefingResponse } from "@/lib/types";
-import {
-  mockBriefingClient,
-  type BriefingClientInterface,
-} from "./mock/briefing-client";
+import { MOCK_TODAY_BRIEFING } from "@/lib/mock/briefings";
 
 // ─────────────────────────────────────────────
-// Real API Client
+// Mock Briefing Client Interface
 // ─────────────────────────────────────────────
 
-const realBriefingClient: BriefingClientInterface = {
+export interface BriefingClientInterface {
+  getToday(): Promise<TodayBriefingResponse>;
+}
+
+// ─────────────────────────────────────────────
+// Mock Implementation
+// ─────────────────────────────────────────────
+
+export const mockBriefingClient: BriefingClientInterface = {
   async getToday() {
-    return http.get<TodayBriefingResponse>("/api/v1/briefings/today");
+    await delay(400);
+    return MOCK_TODAY_BRIEFING;
   },
 };
 
-// ─────────────────────────────────────────────
-// Export: mock/real 자동 선택
-// ─────────────────────────────────────────────
-
-export const briefingClient: BriefingClientInterface = API_CONFIG.USE_MOCK
-  ? mockBriefingClient
-  : realBriefingClient;
-
-export type { BriefingClientInterface };
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}

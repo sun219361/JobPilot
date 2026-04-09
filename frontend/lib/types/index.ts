@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────
-// Domain Types
+// Domain Types (기존)
 // ─────────────────────────────────────────────
 
 export type CompanyType = "LARGE" | "MID" | "PUBLIC";
@@ -67,7 +67,7 @@ export interface TodayBriefingResponse {
 }
 
 // ─────────────────────────────────────────────
-// API Response Wrapper Types
+// API Response Types (백엔드 형식)
 // ─────────────────────────────────────────────
 
 export interface ApiError {
@@ -75,13 +75,26 @@ export interface ApiError {
   message: string;
   limit?: number;
   current?: number;
+  [key: string]: unknown;
 }
 
-export interface ApiResponse<T> {
-  success: boolean;
-  data: T | null;
-  error: ApiError | null;
+export interface ApiSuccessResponse<T> {
+  success: true;
+  data: T;
+  error: null;
 }
+
+export interface ApiErrorResponse {
+  success: false;
+  data: null;
+  error: ApiError;
+}
+
+export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
+
+// ─────────────────────────────────────────────
+// Pagination
+// ─────────────────────────────────────────────
 
 export interface PaginationMeta {
   limit: number;
@@ -89,7 +102,7 @@ export interface PaginationMeta {
   total: number;
 }
 
-export interface PaginatedResponse<T> {
+export interface PaginatedData<T> {
   items: T[];
   pagination: PaginationMeta;
 }

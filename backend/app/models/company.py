@@ -45,3 +45,9 @@ class Company(Base, TimestampMixin):
     briefing_items: Mapped[list["BriefingItem"]] = relationship(  # noqa: F821
         "BriefingItem", back_populates="company", lazy="select"
     )
+    news_items: Mapped[list["CompanyNews"]] = relationship(  # noqa: F821
+        "CompanyNews",
+        back_populates="company",
+        order_by="CompanyNews.published_at.desc()",
+        lazy="select",
+    )

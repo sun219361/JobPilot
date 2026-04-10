@@ -3,13 +3,16 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.models.company import CompanyType
 from app.repositories.company_repository import CompanyRepository
+from app.repositories.company_news_repository import CompanyNewsRepository
 from app.schemas.company import CompanyListItem, CompanyDetail, PrepSnapshotSchema
+from app.schemas.company_news import CompanyNewsItem
 
 
 class CompanyService:
 
     def __init__(self, db: Session):
         self.repo = CompanyRepository(db)
+        self.news_repo = CompanyNewsRepository(db)
 
     def get_company_list(
         self,
@@ -33,3 +36,15 @@ class CompanyService:
             PrepSnapshotSchema.model_validate(snapshot) if snapshot else None
         )
         return detail
+
+    def get_company_news(
+        self,
+        company_id: int,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> tuple[list[CompanyNewsItem], int]:
+        """기업별 최신 뉴스 목록 + 총 개수"""
+        items, total = self.news_repo.get_by_company(
+            company_id, limit=limit, offset=offset
+        )
+        return [CompanyNewsItem.model_validate(n) for n in items], total

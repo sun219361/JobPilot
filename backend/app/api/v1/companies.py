@@ -29,6 +29,29 @@ def get_companies(
     )
 
 
+@router.get("/{company_id}/news")
+def get_company_news(
+    company_id: int,
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+):
+    """기업별 최신 뉴스 목록 (published_at 기준 내림차순)"""
+    service = CompanyService(db)
+    # 기업 존재 여부 확인
+    detail = service.get_company_detail(company_id)
+    if not detail:
+        return error_response("COMPANY_NOT_FOUND", "해당 기업을 찾을 수 없습니다.")
+
+    items, total = service.get_company_news(company_id, limit=limit, offset=offset)
+    return paginated_response(
+        items=[item.model_dump() for item in items],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
+
+
 @router.get("/{company_id}")
 def get_company(
     company_id: int,

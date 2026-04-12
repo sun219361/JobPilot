@@ -29,5 +29,10 @@ class Settings(BaseSettings):
     news_default_limit: int = 5           # 기업당 기본 수집 개수
     news_lookback_days: int = 3           # 최근 며칠치 기준
 
+    # Briefing Generation
+    briefing_news_lookback_days: int = 3  # 브리핑에 포함할 뉴스 기준 최근 며칠
+    briefing_max_items_per_company: int = 2  # 기업당 최대 브리핑 아이템 수
+    briefing_max_companies_per_user: int = 5  # 사용자당 최대 반영 기업 수
+
 
 settings = Settings()

@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import ForeignKey, String, Text, Date, DateTime, Integer, Index
+from sqlalchemy import ForeignKey, String, Text, Date, DateTime, Integer, Index, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
@@ -9,6 +9,7 @@ from app.core.db import Base
 class Briefing(Base):
     __tablename__ = "briefings"
     __table_args__ = (
+        UniqueConstraint("user_id", "briefing_date", name="uq_briefings_user_date"),
         Index("ix_briefings_user_id", "user_id"),
         Index("ix_briefings_briefing_date", "briefing_date"),
     )
@@ -35,15 +36,16 @@ class Briefing(Base):
 class BriefingItem(Base):
     """
     브리핑 아이템 — snapshot 방식으로 저장.
-    원본 뉴스/채용공고를 직접 참조하지 않고,
-    브리핑 시점의 headline/summary/action_point를 복사 저장한다.
-    company_id는 nullable FK로만 연결 (원본 삭제 시에도 브리핑 유지).
+    원본 뉴스를 직접 참조하지 않고, 브리핑 시점의 headline/summary/action_point를 복사 저장.
+    company_id는 nullable FK (원본 삭제 시에도 브리핑 유지).
+    news_id는 nullable FK — 뉴스 기반으로 생성된 경우 원본 CompanyNews id 참조.
     """
 
     __tablename__ = "briefing_items"
     __table_args__ = (
         Index("ix_briefing_items_briefing_id", "briefing_id"),
         Index("ix_briefing_items_company_id", "company_id"),
+        Index("ix_briefing_items_briefing_sort", "briefing_id", "sort_order"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
@@ -53,8 +55,11 @@ class BriefingItem(Base):
     company_id: Mapped[int | None] = mapped_column(
         ForeignKey("companies.id", ondelete="SET NULL"), nullable=True
     )
+    news_id: Mapped[int | None] = mapped_column(
+        ForeignKey("company_news.id", ondelete="SET NULL"), nullable=True
+    )
 
-    # snapshot 필드
+    # snapshot 필드 — 원본이 삭제돼도 브리핑 내용은 유지된다
     source_type: Mapped[str] = mapped_column(
         String(30), nullable=False
     )  # "news" | "job" | "notice"

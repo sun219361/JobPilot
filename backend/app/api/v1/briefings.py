@@ -18,8 +18,15 @@ def get_today_briefing(
 ):
     """
     오늘 브리핑 조회.
-    브리핑 없음: { "briefing": null, "items": [] }
-    브리핑 있음: { "briefing": {...}, "items": [...] }
+
+    Response:
+    - 브리핑 없음: { "success": true, "data": { "briefing": null, "items": [] }, "error": null }
+    - 브리핑 있음: { "success": true, "data": { "briefing": {...}, "items": [...sorted by sort_order...] }, "error": null }
+
+    Notes:
+    - briefing_date 는 서버 로컬 날짜(date.today()) 기준
+    - items 는 sort_order 오름차순 정렬
+    - 브리핑 생성은 배치 스크립트(generate_today_briefings.py)가 담당
     """
     service = BriefingService(db)
     result = service.get_today_briefing(current_user)

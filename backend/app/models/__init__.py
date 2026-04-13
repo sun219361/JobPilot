@@ -5,6 +5,7 @@ from app.models.subscription import Subscription
 from app.models.prep_snapshot import PrepSnapshot
 from app.models.briefing import Briefing, BriefingItem
 from app.models.company_news import CompanyNews
+from app.models.company_job_posting import CompanyJobPosting, PostingStatus
 
 __all__ = [
     "TimestampMixin",
@@ -16,4 +17,6 @@ __all__ = [
     "Briefing",
     "BriefingItem",
     "CompanyNews",
+    "CompanyJobPosting",
+    "PostingStatus",
 ]

@@ -51,3 +51,9 @@ class Company(Base, TimestampMixin):
         order_by="CompanyNews.published_at.desc()",
         lazy="select",
     )
+    job_postings: Mapped[list["CompanyJobPosting"]] = relationship(  # noqa: F821
+        "CompanyJobPosting",
+        back_populates="company",
+        order_by="CompanyJobPosting.posted_at.desc()",
+        lazy="select",
+    )

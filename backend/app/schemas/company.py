@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import date, datetime
+from typing import Optional
 from pydantic import BaseModel, ConfigDict
 
 from app.models.company import CompanyType
@@ -14,6 +15,8 @@ class PrepSnapshotSchema(BaseModel):
     talent_summary: str
     cover_letter_points: list[str]
     interview_points: list[str]
+    generation_date: Optional[date] = None   # 생성 기준 날짜 (Phase 4 추가)
+    source_version: Optional[str] = None     # "auto_batch" | "seed" | "manual"
     generated_at: datetime
 
 

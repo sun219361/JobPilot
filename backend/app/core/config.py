@@ -41,5 +41,17 @@ class Settings(BaseSettings):
     job_lookback_days: int = 30                # 최근 며칠치 기준
     job_keywords: str = "Python,SQL,데이터,AI,금융,협업"  # rule-based 키워드 목록 (쉼표 구분)
 
+    # Prep Snapshot Generation (Phase 4)
+    # 생성 대상 정책: "subscriptions" (관심기업만) | "all" (전체 기업)
+    prep_target_mode: str = "subscriptions"
+    # 뉴스 조회 기준 일수 (최근 N일 이내)
+    prep_news_lookback_days: int = 7
+    # snapshot 생성 시 사용할 최대 뉴스 건수
+    prep_max_news_items: int = 3
+    # snapshot 생성 시 사용할 최대 채용공고 건수
+    prep_max_job_items: int = 3
+    # 생성 정책: "daily" (하루 1개) | "always" (매번 새로 생성)
+    prep_generation_mode: str = "daily"
+
 
 settings = Settings()

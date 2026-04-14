@@ -30,7 +30,7 @@ pip install -r requirements.txt
 ### 3. 데이터베이스 초기화
 
 ```bash
-# 마이그레이션 실행 (004 migration까지 포함)
+# 마이그레이션 실행 (005 migration까지 포함)
 alembic upgrade head
 
 # 테스트 데이터 생성
@@ -127,6 +127,27 @@ python -m app.scripts.briefings.generate_today_briefings --dry-run
 python -m app.scripts.briefings.generate_today_briefings --overwrite
 ```
 
+### Phase 4 – PrepSnapshot 자동 생성
+```bash
+# 전체 관심기업 snapshot 생성 (오늘 날짜)
+python -m app.scripts.prep.generate_prep_snapshots
+
+# 특정 기업만 생성
+python -m app.scripts.prep.generate_prep_snapshots --company-id 31
+
+# 미리보기 (저장 없음)
+python -m app.scripts.prep.generate_prep_snapshots --dry-run
+
+# 기존 snapshot 덮어쓰기
+python -m app.scripts.prep.generate_prep_snapshots --overwrite
+
+# 특정 날짜 지정
+python -m app.scripts.prep.generate_prep_snapshots --date 2026-04-14
+
+# 최대 기업 수 제한
+python -m app.scripts.prep.generate_prep_snapshots --limit 5
+```
+
 ### Phase 3 – 채용공고 수집
 ```bash
 # 전체 관심기업 채용공고 수집
@@ -155,6 +176,9 @@ python -m app.scripts.jobs.collect_jobs --days 60
 
 # 매일 08:00 채용공고 수집
 0 8 * * * cd /home/user/webapp/backend && /home/user/webapp/backend/.venv/bin/python -m app.scripts.jobs.collect_jobs >> /var/log/collect_jobs.log 2>&1
+
+# 매일 08:30 PrepSnapshot 자동 생성 (뉴스+채용공고 수집 완료 후)
+30 8 * * * cd /home/user/webapp/backend && /home/user/webapp/backend/.venv/bin/python -m app.scripts.prep.generate_prep_snapshots >> /var/log/generate_prep_snapshots.log 2>&1
 ```
 
 ---
@@ -173,6 +197,7 @@ python -m app.scripts.jobs.collect_jobs --days 60
 | `Briefing` | `briefings` | 날짜별 브리핑 – unique(user_id, briefing_date) (Phase 2) |
 | `BriefingItem` | `briefing_items` | 브리핑 아이템 (뉴스 기반) (Phase 2) |
 | `CompanyJobPosting` | `company_job_postings` | 기업별 채용공고 스냅샷 (Phase 3) |
+| `PrepSnapshot` (확장) | `prep_snapshots` | 기업 준비 카드 – auto_batch 생성 지원 (Phase 4) |
 
 ### 마이그레이션 히스토리
 
@@ -182,6 +207,7 @@ python -m app.scripts.jobs.collect_jobs --days 60
 | 002 | `002_company_news.py` | company_news 테이블 |
 | 003 | `003_briefing_constraints.py` | briefings unique constraint, briefing_items news_id FK |
 | 004 | `004_company_job_postings.py` | company_job_postings 테이블, postingstatus enum |
+| 005 | `005_prep_snapshot_constraints.py` | prep_snapshots에 generation_date, source_version 추가, unique(company_id, generation_date) |
 
 ```bash
 # 마이그레이션 실행
@@ -256,6 +282,11 @@ backend/
 │   │   ├── briefing_service.py         # Phase 2
 │   │   ├── briefing_generation_service.py # Phase 2 배치용
 │   │   └── job_collection_service.py   # Phase 3 ← NEW
+│   ├── domains/                  # Phase 4 ← NEW (도메인 로직 분리)
+│   │   └── prep/
+│   │       ├── generator.py      # 규칙 기반 snapshot 필드 생성
+│   │       ├── repository.py     # PrepSnapshot 배치 전용 DB 접근
+│   │       └── service.py        # PrepSnapshotGenerationService
 │   ├── scripts/
 │   │   ├── seed.py
 │   │   ├── news/
@@ -263,14 +294,16 @@ backend/
 │   │   ├── briefings/
 │   │   │   ├── generate_today_briefings.py  # Phase 2 배치
 │   │   │   └── action_point.py   # 액션 포인트 유틸
-│   │   └── jobs/                 # Phase 3 ← NEW
-│   │       ├── collect_jobs.py   # 배치 스크립트
-│   │       ├── job_posting_item.py  # DTO
-│   │       ├── job_keywords.py   # 키워드 추출 유틸
-│   │       ├── duplicate_key.py  # 중복 키 생성 유틸
-│   │       └── providers/
-│   │           ├── base.py       # 추상 Provider
-│   │           └── saramin_provider.py  # 사람인 Provider
+│   │   ├── jobs/                 # Phase 3
+│   │   │   ├── collect_jobs.py   # 배치 스크립트
+│   │   │   ├── job_posting_item.py  # DTO
+│   │   │   ├── job_keywords.py   # 키워드 추출 유틸
+│   │   │   ├── duplicate_key.py  # 중복 키 생성 유틸
+│   │   │   └── providers/
+│   │   │       ├── base.py       # 추상 Provider
+│   │   │       └── saramin_provider.py  # 사람인 Provider
+│   │   └── prep/                 # Phase 4 ← NEW
+│   │       └── generate_prep_snapshots.py  # CLI 배치 스크립트
 │   └── main.py
 ├── alembic/
 │   └── versions/
@@ -591,10 +624,11 @@ class MyProvider(BaseJobProvider):
 | Phase 1 | ✅ 완료 | 뉴스 수집 파이프라인 (Naver API) |
 | Phase 2 | ✅ 완료 | 브리핑 자동 생성 배치 |
 | Phase 3 | ✅ 완료 | 채용공고 수집 파이프라인 (Saramin API) |
-| Phase 4 | 🔜 예정 | 이메일/알림 발송 (SendGrid, Firebase) |
-| Phase 5 | 🔜 예정 | JWT 인증 도입 |
-| Phase 6 | 🔜 예정 | 채용공고 데이터 → 브리핑 통합 (BriefingItem source_type='job') |
+| Phase 4 | ✅ 완료 | PrepSnapshot 자동 생성 배치 (rule-based, daily 정책) |
+| Phase 5 | 🔜 예정 | 이메일/알림 발송 (SendGrid, Firebase) |
+| Phase 6 | 🔜 예정 | JWT 인증 도입 |
+| Phase 7 | 🔜 예정 | 채용공고 데이터 → 브리핑 통합 (BriefingItem source_type='job') |
 
 ---
 
-**Last Updated:** 2026-04-13
+**Last Updated:** 2026-04-14

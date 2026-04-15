@@ -53,5 +53,10 @@ class Settings(BaseSettings):
     # 생성 정책: "daily" (하루 1개) | "always" (매번 새로 생성)
     prep_generation_mode: str = "daily"
 
+    # ── JWT Authentication (Phase 5) ──────────────────────────────────────
+    secret_key: str = "CHANGE_ME_IN_PRODUCTION_USE_STRONG_RANDOM_KEY"
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 60
+
 
 settings = Settings()

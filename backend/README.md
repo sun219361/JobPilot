@@ -30,7 +30,7 @@ pip install -r requirements.txt
 ### 3. 데이터베이스 초기화
 
 ```bash
-# 마이그레이션 실행 (005 migration까지 포함)
+# 마이그레이션 실행 (006 migration까지 포함)
 alembic upgrade head
 
 # 테스트 데이터 생성
@@ -71,23 +71,43 @@ GET /api/v1/companies/{company_id}/news?limit=20&offset=0
 GET /api/v1/companies/{company_id}/jobs?limit=20&offset=0
 ```
 
-### Subscriptions (관심기업)
+### Auth (인증)
 ```bash
-# 관심기업 목록
-GET /api/v1/subscriptions
+# 회원가입
+POST /api/v1/auth/signup
+Body: {"email": "user@example.com", "password": "password1234", "nickname": "닉네임"}
 
-# 관심기업 추가
-POST /api/v1/subscriptions
-Body: {"company_id": 1, "memo": "메모"}
+# 로그인 (JWT access token 발급)
+POST /api/v1/auth/login
+Body: {"email": "user@example.com", "password": "password1234"}
+# Response: {"success": true, "data": {"access_token": "eyJ...", "token_type": "bearer"}}
 
-# 관심기업 삭제
-DELETE /api/v1/subscriptions/{subscription_id}
+# 내 프로필 조회 (인증 필요)
+GET /api/v1/users/me
+Header: Authorization: Bearer <access_token>
 ```
 
-### Briefings (브리핑)
+### Subscriptions (관심기업) – 인증 필요
 ```bash
-# 오늘의 브리핑
+# 관심기업 목록 (인증 필요)
+GET /api/v1/subscriptions
+Header: Authorization: Bearer <access_token>
+
+# 관심기업 추가 (인증 필요)
+POST /api/v1/subscriptions
+Header: Authorization: Bearer <access_token>
+Body: {"company_id": 1, "memo": "메모"}
+
+# 관심기업 삭제 (인증 필요)
+DELETE /api/v1/subscriptions/{subscription_id}
+Header: Authorization: Bearer <access_token>
+```
+
+### Briefings (브리핑) – 인증 필요
+```bash
+# 오늘의 브리핑 (인증 필요)
 GET /api/v1/briefings/today
+Header: Authorization: Bearer <access_token>
 ```
 
 ---
@@ -203,11 +223,17 @@ python -m app.scripts.jobs.collect_jobs --days 60
 
 | 버전 | 파일 | 내용 |
 |------|------|------|
+
+# ─── Phase 5: JWT Authentication ────
+SECRET_KEY=CHANGE_ME_IN_PRODUCTION_USE_STRONG_RANDOM_KEY
+JWT_ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=60
 | 001 | `001_initial_schema.py` | users, companies, subscriptions, prep_snapshots |
 | 002 | `002_company_news.py` | company_news 테이블 |
 | 003 | `003_briefing_constraints.py` | briefings unique constraint, briefing_items news_id FK |
 | 004 | `004_company_job_postings.py` | company_job_postings 테이블, postingstatus enum |
 | 005 | `005_prep_snapshot_constraints.py` | prep_snapshots에 generation_date, source_version 추가, unique(company_id, generation_date) |
+| 006 | `006_user_password_hash.py` | users 테이블에 password_hash 컬럼 추가 (Phase 5 JWT 인증) |
 
 ```bash
 # 마이그레이션 실행
@@ -229,7 +255,7 @@ alembic revision --autogenerate -m "description"
 python -m app.scripts.seed
 
 # 포함 내용:
-# - 1명의 테스트 유저 (dev@jobpilot.kr, id=1)
+# - 1명의 테스트 유저 (test@example.com / password1234)
 # - 30개 기업 (대기업 10, 중견기업 10, 공공기관 10)
 # - 5개 기업의 PrepSnapshot
 # - 오늘 날짜의 브리핑 (6개 아이템)
@@ -246,13 +272,16 @@ python -m app.scripts.seed
 backend/
 ├── app/
 │   ├── api/v1/
+│   │   ├── auth.py               # 인증 엔드포인트 (signup/login) – Phase 5
+│   │   ├── users.py              # /users/me 엔드포인트 – Phase 5
 │   │   ├── companies.py          # 기업 엔드포인트 (뉴스 + 채용공고 포함)
 │   │   ├── subscriptions.py      # 관심기업 엔드포인트
 │   │   └── briefings.py          # 브리핑 엔드포인트
 │   ├── core/
-│   │   ├── config.py             # 환경 설정 (Phase 1~3 설정값 포함)
+│   │   ├── config.py             # 환경 설정 (Phase 1~5 설정값 포함)
 │   │   ├── db.py                 # DB 연결
-│   │   ├── dependencies.py       # FastAPI 의존성
+│   │   ├── dependencies.py       # FastAPI 의존성 (JWT get_current_user)
+│   │   ├── security.py           # JWT 생성/검증 + bcrypt 해시 – Phase 5
 │   │   └── response.py           # 응답 스키마
 │   ├── models/
 │   │   ├── user.py
@@ -269,6 +298,7 @@ backend/
 │   │   ├── briefing.py           # Phase 2
 │   │   └── company_job_posting.py # Phase 3 ← NEW
 │   ├── repositories/
+│   │   ├── user_repository.py    # UserRepository – Phase 5
 │   │   ├── company_repository.py
 │   │   ├── subscription_repository.py
 │   │   ├── company_news_repository.py  # Phase 1
@@ -282,7 +312,10 @@ backend/
 │   │   ├── briefing_service.py         # Phase 2
 │   │   ├── briefing_generation_service.py # Phase 2 배치용
 │   │   └── job_collection_service.py   # Phase 3 ← NEW
-│   ├── domains/                  # Phase 4 ← NEW (도메인 로직 분리)
+│   ├── domains/                  # 도메인 로직 분리
+│   │   ├── auth/                 # Phase 5 ← NEW
+│   │   │   ├── schemas.py        # SignupRequest, LoginRequest, TokenResponse
+│   │   │   └── service.py        # AuthService (signup, authenticate, create_token)
 │   │   └── prep/
 │   │       ├── generator.py      # 규칙 기반 snapshot 필드 생성
 │   │       ├── repository.py     # PrepSnapshot 배치 전용 DB 접근
@@ -363,35 +396,58 @@ cp .env.example .env
 
 ---
 
-## 🔐 인증 (준비 단계)
+## 🔐 인증 (Phase 5 – JWT Bearer Token)
 
-현재는 `app/core/dependencies.py`의 `get_current_user`가 fake user (id=1)를 반환합니다.
+Phase 5부터 JWT access token 기반 실제 인증이 적용됩니다.
 
-**JWT 전환 방법:**
-```python
-# app/core/dependencies.py 수정
+### 인증이 필요한 엔드포인트
+- `GET /api/v1/subscriptions` – 관심기업 목록
+- `POST /api/v1/subscriptions` – 관심기업 추가
+- `DELETE /api/v1/subscriptions/{id}` – 관심기업 삭제
+- `GET /api/v1/briefings/today` – 오늘의 브리핑
+- `GET /api/v1/users/me` – 내 프로필
 
-from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
+### 인증이 불필요한 엔드포인트 (공개)
+- `GET /health`
+- `GET /api/v1/companies` (목록/상세/뉴스/채용공고)
+- `POST /api/v1/auth/signup`
+- `POST /api/v1/auth/login`
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+### 사용 방법
 
-async def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
-) -> User:
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = payload.get("sub")
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user:
-            raise HTTPException(status_code=401)
-        return user
-    except JWTError:
-        raise HTTPException(status_code=401)
+```bash
+# 1. 회원가입
+curl -X POST http://localhost:8000/api/v1/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com", "password": "password1234", "nickname": "테스트유저"}'
+
+# 2. 로그인 → access_token 저장
+TOKEN=$(curl -s -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com", "password": "password1234"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['access_token'])")
+
+# 3. 인증이 필요한 API 호출
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/v1/users/me
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/v1/subscriptions
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/v1/briefings/today
 ```
 
-이 함수만 수정하면 모든 엔드포인트에 JWT 인증이 적용됩니다.
+### seed 계정
+```
+email:    test@example.com
+password: password1234
+```
+
+### 토큰 설정
+- 알고리즘: HS256
+- 유효 시간: `ACCESS_TOKEN_EXPIRE_MINUTES` (기본 60분)
+- SECRET_KEY: `.env`에서 설정 (운영 환경에서는 강력한 랜덤 키 사용)
+
+```bash
+# 강력한 시크릿 키 생성
+python3 -c "import secrets; print(secrets.token_hex(32))"
+```
 
 ---
 
@@ -401,11 +457,22 @@ async def get_current_user(
 # Health check
 curl http://localhost:8000/health
 
-# 기업 목록
-curl "http://localhost:8000/api/v1/companies?limit=5"
+# 회원가입 (신규)
+curl -X POST "http://localhost:8000/api/v1/auth/signup" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "me@example.com", "password": "password1234", "nickname": "나"}'
 
-# 기업 검색
-curl --get --data-urlencode "q=삼성" "http://localhost:8000/api/v1/companies"
+# 로그인
+TOKEN=$(curl -s -X POST "http://localhost:8000/api/v1/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com", "password": "password1234"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['access_token'])")
+
+# 내 프로필
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/v1/users/me
+
+# 기업 목록 (공개)
+curl "http://localhost:8000/api/v1/companies?limit=5"
 
 # 기업 상세
 curl "http://localhost:8000/api/v1/companies/31"
@@ -413,22 +480,20 @@ curl "http://localhost:8000/api/v1/companies/31"
 # 기업 뉴스
 curl "http://localhost:8000/api/v1/companies/31/news"
 
-# 기업 채용공고 (Phase 3)
+# 기업 채용공고
 curl "http://localhost:8000/api/v1/companies/31/jobs"
 
-# 관심기업 목록
-curl "http://localhost:8000/api/v1/subscriptions"
+# 관심기업 목록 (인증 필요)
+curl -H "Authorization: Bearer $TOKEN" "http://localhost:8000/api/v1/subscriptions"
 
 # 관심기업 추가
-curl -X POST "http://localhost:8000/api/v1/subscriptions" \
+curl -X POST -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"company_id": 36}'
-
-# 관심기업 삭제
-curl -X DELETE "http://localhost:8000/api/v1/subscriptions/7"
+  -d '{"company_id": 36}' \
+  "http://localhost:8000/api/v1/subscriptions"
 
 # 오늘의 브리핑
-curl "http://localhost:8000/api/v1/briefings/today"
+curl -H "Authorization: Bearer $TOKEN" "http://localhost:8000/api/v1/briefings/today"
 ```
 
 ---
@@ -625,10 +690,10 @@ class MyProvider(BaseJobProvider):
 | Phase 2 | ✅ 완료 | 브리핑 자동 생성 배치 |
 | Phase 3 | ✅ 완료 | 채용공고 수집 파이프라인 (Saramin API) |
 | Phase 4 | ✅ 완료 | PrepSnapshot 자동 생성 배치 (rule-based, daily 정책) |
-| Phase 5 | 🔜 예정 | 이메일/알림 발송 (SendGrid, Firebase) |
-| Phase 6 | 🔜 예정 | JWT 인증 도입 |
+| Phase 5 | ✅ 완료 | JWT access token 인증 (signup/login/users/me) |
+| Phase 6 | 🔜 예정 | 이메일/알림 발송 (SendGrid, Firebase) |
 | Phase 7 | 🔜 예정 | 채용공고 데이터 → 브리핑 통합 (BriefingItem source_type='job') |
 
 ---
 
-**Last Updated:** 2026-04-14
+**Last Updated:** 2026-04-15

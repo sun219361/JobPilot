@@ -16,6 +16,7 @@ from datetime import datetime, date, timezone
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from app.core.db import SessionLocal
+from app.core.security import hash_password
 from app.models import User, Company, CompanyType, Subscription, PrepSnapshot, Briefing, BriefingItem
 
 
@@ -33,7 +34,14 @@ def run_seed():
 
         # ── 1. 테스트 유저 ────────────────────────────────
         print("👤 유저 생성 중...")
-        user = User(id=1, email="dev@jobpilot.kr", nickname="개발자")
+        # Phase 5: 비밀번호는 bcrypt hash로 저장
+        # 개발용 계정: test@example.com / password1234
+        user = User(
+            email="test@example.com",
+            password_hash=hash_password("password1234"),
+            nickname="테스트유저",
+            is_active=True,
+        )
         db.add(user)
         db.flush()
 
@@ -196,6 +204,8 @@ def run_seed():
                     company_id=company_obj.id,
                     generated_at=now,
                     created_at=now,
+                    generation_date=now.date(),   # Phase 4: NOT NULL 컬럼
+                    source_version="seed",         # Phase 4: 소스 구분
                     **pd_item,
                 )
                 db.add(snap)

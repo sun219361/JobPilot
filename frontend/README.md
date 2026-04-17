@@ -17,6 +17,321 @@ npm install
 cp .env.example .env.local
 ```
 
+**Mock 모드 (백엔드 불필요, 로그인 기능 비활성화):**
+```bash
+# .env.local
+NEXT_PUBLIC_USE_MOCK=true
+```
+
+**Real API 모드 (백엔드 필요, JWT 인증 활성화):**
+```bash
+# .env.local
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+NEXT_PUBLIC_USE_MOCK=false
+```
+
+### 3. 개발 서버 실행
+
+```bash
+# 개발 모드
+npm run dev
+
+# 프로덕션 빌드
+npm run build
+npm start
+
+# PM2로 실행
+pm2 start ecosystem.config.cjs
+```
+
+---
+
+## 🔐 Phase 6: JWT 인증 (신규)
+
+### 인증 흐름
+
+```
+회원가입 (/signup)
+  → POST /api/v1/auth/signup (email, password, nickname)
+  → 성공 시 자동 로그인
+
+로그인 (/login)
+  → POST /api/v1/auth/login (email, password)
+  → access_token 반환 → localStorage 저장
+  → GET /api/v1/users/me → 사용자 정보 저장
+
+앱 시작 시 토큰 복원
+  → localStorage에서 token 읽기
+  → GET /api/v1/users/me 호출
+  → 성공: 인증 상태 복원 / 실패: 토큰 삭제 + 비인증
+
+로그아웃
+  → localStorage에서 token 삭제 → 비인증 상태
+```
+
+### 보호된 페이지
+
+| 페이지 | 경로 | AuthGuard |
+|--------|------|-----------|
+| 오늘의 브리핑 | `/briefings/today` | ✅ |
+| 관심기업 관리 | `/subscriptions` | ✅ |
+
+> 미인증 사용자가 보호된 페이지 접근 시 `/login`으로 자동 리다이렉트됩니다.
+
+### 공개 페이지
+
+| 페이지 | 경로 |
+|--------|------|
+| 홈 | `/` |
+| 기업 상세 | `/companies/[id]` |
+| 로그인 | `/login` |
+| 회원가입 | `/signup` |
+
+### 개발 시드 계정 (테스트용)
+
+```
+이메일: test@example.com
+비밀번호: password1234
+```
+
+### curl 테스트 예시
+
+```bash
+# 1. 회원가입
+curl -X POST http://localhost:8000/api/v1/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "password": "password1234", "nickname": "테스터"}'
+
+# 2. 로그인 → 토큰 저장
+TOKEN=$(curl -s -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com", "password": "password1234"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['access_token'])")
+
+# 3. 현재 사용자 조회
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/v1/users/me
+
+# 4. 관심기업 목록 (Bearer 토큰 필요)
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/v1/subscriptions
+```
+
+### Fake User → JWT 전환 내용
+
+| 항목 | 이전 (Phase 0) | 이후 (Phase 6) |
+|------|---------------|----------------|
+| 인증 방식 | 없음 (user_id=1 고정) | JWT Bearer Token |
+| 토큰 저장 | N/A | localStorage |
+| 보호 페이지 | 없음 | AuthGuard 컴포넌트 |
+| 로그인 페이지 | 없음 | `/login` |
+| 회원가입 | 없음 | `/signup` |
+| 헤더 | 로그인/가입 링크 없음 | 상태에 따라 동적 변경 |
+| API 헤더 | 없음 | Authorization: Bearer 자동 주입 |
+| 401 처리 | N/A | 자동 로그아웃 |
+
+---
+
+## 📱 주요 페이지
+
+### 1. 홈 (`/`)
+- 서비스 소개 및 주요 기능 안내
+
+### 2. 로그인 (`/login`)
+- 이메일/비밀번호 입력
+- 유효성 검사 (이메일 형식, 필수 입력)
+- 에러 메시지 표시
+- Mock 모드 안내
+- 회원가입 페이지 링크
+
+### 3. 회원가입 (`/signup`)
+- 이메일, 닉네임, 비밀번호(8자↑), 비밀번호 확인
+- 중복 이메일 감지 (409 에러 처리)
+- 가입 후 자동 로그인 → `/briefings/today` 이동
+- Mock 모드 안내
+
+### 4. 관심기업 관리 (`/subscriptions`) 🔒
+- **AuthGuard로 보호됨 (로그인 필요)**
+- 등록된 관심기업 목록
+- 기업 검색 및 추가 (최대 5개)
+- 관심기업 삭제
+
+### 5. 기업 상세 (`/companies/[id]`)
+- 기업 기본 정보 및 채용 준비 스냅샷
+
+### 6. 오늘의 브리핑 (`/briefings/today`) 🔒
+- **AuthGuard로 보호됨 (로그인 필요)**
+- 관심기업의 최신 뉴스·채용 공고 브리핑
+
+---
+
+## 🏗️ 프로젝트 구조
+
+```
+frontend/
+├── app/                          # Next.js App Router
+│   ├── page.tsx                  # 랜딩 페이지
+│   ├── layout.tsx                # 루트 레이아웃 (AuthProvider 포함)
+│   ├── login/
+│   │   └── page.tsx              # 로그인 페이지 (신규)
+│   ├── signup/
+│   │   └── page.tsx              # 회원가입 페이지 (신규)
+│   ├── subscriptions/
+│   │   └── page.tsx              # 관심기업 관리 (AuthGuard 적용)
+│   ├── companies/[id]/
+│   │   └── page.tsx              # 기업 상세
+│   └── briefings/today/
+│       └── page.tsx              # 오늘의 브리핑 (AuthGuard 적용)
+│
+├── components/
+│   ├── auth/                     # 인증 컴포넌트 (신규)
+│   │   └── AuthGuard.tsx         # 미인증 리다이렉트 + 로딩 스켈레톤
+│   ├── layout/
+│   │   └── Navbar.tsx            # 인증 상태 표시 (신규: 닉네임/로그아웃)
+│   ├── common/                   # 공통 컴포넌트
+│   ├── subscriptions/
+│   ├── companies/
+│   └── briefings/
+│
+├── lib/
+│   ├── api/
+│   │   ├── config.ts             # API 설정
+│   │   ├── http.ts               # HTTP 클라이언트 (Bearer 자동 주입, 401 처리)
+│   │   ├── company-client.ts
+│   │   ├── subscription-client.ts
+│   │   ├── briefing-client.ts
+│   │   └── mock/
+│   ├── auth/                     # JWT 인증 모듈 (신규)
+│   │   ├── token-storage.ts      # localStorage get/set/remove
+│   │   ├── auth-client.ts        # signup, login, fetchMe API
+│   │   ├── auth-context.tsx      # AuthProvider (React Context)
+│   │   └── use-auth.ts           # useAuth() custom hook
+│   ├── types/
+│   │   └── index.ts              # 도메인 타입 (AuthUser, AuthState 등 포함)
+│   ├── mock/
+│   └── utils/
+│
+├── .env.example
+├── .env.local
+├── ecosystem.config.cjs          # PM2 설정
+└── package.json
+```
+
+---
+
+## 🔌 API 클라이언트 구조
+
+### Bearer Token 자동 주입
+
+`lib/api/http.ts`에서 모든 요청에 자동으로 Bearer 토큰을 주입합니다:
+
+```typescript
+// lib/api/http.ts
+const token = getAccessToken(); // localStorage에서 읽기
+const headers = {
+  "Content-Type": "application/json",
+  ...(token ? { Authorization: `Bearer ${token}` } : {}),
+};
+
+// 401 발생 시 자동 로그아웃
+if (response.status === 401) {
+  localStorage.removeItem("jobpilot_access_token");
+}
+```
+
+### AuthContext 흐름
+
+```typescript
+// 앱 시작 → 토큰 복원
+useEffect(() => {
+  fetchMe().then(me => {
+    if (me) setAuthState("authenticated");
+    else { removeAccessToken(); setAuthState("unauthenticated"); }
+  });
+}, []);
+```
+
+---
+
+## 🧪 테스트 시나리오
+
+1. **비인증 상태에서 보호 페이지 접근**
+   - `/subscriptions` 또는 `/briefings/today` 직접 접근
+   - → 자동으로 `/login` 리다이렉트 확인
+
+2. **회원가입 → 자동 로그인**
+   - `/signup`에서 새 계정 생성
+   - → 가입 직후 `/briefings/today`로 이동 확인
+   - → Navbar에 닉네임 표시 확인
+
+3. **로그인 → 보호 페이지 접근**
+   - `test@example.com` / `password1234` 로그인
+   - → `/briefings/today` 접근 성공 확인
+
+4. **잘못된 자격증명**
+   - 틀린 이메일/비밀번호 입력
+   - → "이메일 또는 비밀번호가 올바르지 않습니다" 에러 표시 확인
+
+5. **로그아웃**
+   - Navbar의 로그아웃 버튼 클릭
+   - → 홈(`/`)으로 이동, 로그인/회원가입 링크 표시 확인
+
+6. **새로고침 후 인증 상태 유지**
+   - 로그인 후 브라우저 새로고침
+   - → 여전히 로그인된 상태 유지 확인 (localStorage 토큰 복원)
+
+---
+
+## 🔍 트러블슈팅
+
+### 빌드 오류
+```bash
+rm -rf .next && npm run build
+```
+
+### 로그인이 안 되는 경우
+```bash
+# Mock 모드 확인
+cat .env.local | grep USE_MOCK
+# NEXT_PUBLIC_USE_MOCK=false 여야 함
+
+# 백엔드 상태 확인
+curl http://localhost:8000/health
+```
+
+### 환경변수 미적용
+```bash
+npm run build && pm2 restart jobpilot-frontend
+```
+
+---
+
+## 🌐 URL
+
+| 환경 | URL |
+|------|-----|
+| 로컬 | http://localhost:3000 |
+| 샌드박스 | https://3000-ix2krp6d80cvydxsp6ch8-b9b802c4.sandbox.novita.ai |
+
+---
+
+**Last Updated:** 2026-04-17  
+**Framework:** Next.js 16.2.2  
+**Phase:** 6 (JWT Authentication)
+
+## 🚀 빠른 시작
+
+### 1. 의존성 설치
+
+```bash
+npm install
+```
+
+### 2. 환경 설정
+
+```bash
+# .env.local 파일 생성
+cp .env.example .env.local
+```
+
 **Mock 모드 (백엔드 불필요):**
 ```bash
 # .env.local

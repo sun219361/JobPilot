@@ -9,10 +9,11 @@ import { ErrorState } from "@/components/common/ErrorState";
 import { ListSkeleton, BriefingItemSkeleton } from "@/components/common/LoadingSkeleton";
 import { BriefingHeader } from "@/components/briefings/BriefingHeader";
 import { BriefingItemCard } from "@/components/briefings/BriefingItemCard";
+import { AuthGuard } from "@/components/auth/AuthGuard";
 
 type PageState = "loading" | "success" | "error";
 
-export default function TodayBriefingPage() {
+function TodayBriefingContent() {
   const [state, setState] = useState<PageState>("loading");
   const [data, setData] = useState<TodayBriefingResponse | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -92,5 +93,13 @@ export default function TodayBriefingPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function TodayBriefingPage() {
+  return (
+    <AuthGuard>
+      <TodayBriefingContent />
+    </AuthGuard>
   );
 }

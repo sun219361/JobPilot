@@ -1,4 +1,45 @@
 // ─────────────────────────────────────────────
+// Auth Types (Phase 5 JWT)
+// ─────────────────────────────────────────────
+
+/** 로그인된 사용자 정보 (/api/v1/users/me 응답) */
+export interface AuthUser {
+  id: number;
+  email: string;
+  nickname: string;
+  is_active: boolean;
+}
+
+/** 인증 상태 */
+export type AuthState = "loading" | "authenticated" | "unauthenticated";
+
+/** 로그인 요청 */
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+/** 로그인 응답 */
+export interface LoginResponse {
+  access_token: string;
+  token_type: string;
+}
+
+/** 회원가입 요청 */
+export interface SignupRequest {
+  email: string;
+  password: string;
+  nickname: string;
+}
+
+/** 회원가입 응답 */
+export interface SignupResponse {
+  id: number;
+  email: string;
+  nickname: string;
+}
+
+// ─────────────────────────────────────────────
 // Domain Types (기존)
 // ─────────────────────────────────────────────
 

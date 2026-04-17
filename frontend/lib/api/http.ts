@@ -1,5 +1,6 @@
 import { API_CONFIG } from "./config";
 import type { ApiResponse } from "@/lib/types";
+import { getAccessToken } from "@/lib/auth/token-storage";
 
 // ─────────────────────────────────────────────
 // Custom Error Classes
@@ -57,9 +58,11 @@ export async function httpClient<T>(
     if (query) url += `?${query}`;
   }
 
-  // 기본 헤더
+  // 기본 헤더 + 인증 헤더 자동 포함
+  const token = getAccessToken();
   const headers: HeadersInit = {
     "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...fetchOptions.headers,
   };
 
@@ -89,6 +92,15 @@ export async function httpClient<T>(
   // 성공 여부 확인
   if (!json.success || json.error) {
     const error = json.error || { code: "UNKNOWN_ERROR", message: "알 수 없는 오류" };
+
+    // 401: 토큰 만료 → localStorage 정리 (자동 로그아웃 트리거)
+    if (response.status === 401) {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("jobpilot_access_token");
+        // AuthProvider의 상태는 페이지 리로드로 자동 초기화됨
+      }
+    }
+
     throw new ApiError(
       error.code,
       error.message,

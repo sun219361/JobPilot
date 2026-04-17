@@ -9,10 +9,11 @@ import { ErrorState } from "@/components/common/ErrorState";
 import { ListSkeleton, CompanyCardSkeleton } from "@/components/common/LoadingSkeleton";
 import { SubscriptionCard } from "@/components/subscriptions/SubscriptionCard";
 import { SubscriptionSearchPanel } from "@/components/subscriptions/SubscriptionSearchPanel";
+import { AuthGuard } from "@/components/auth/AuthGuard";
 
 type PageState = "loading" | "success" | "error";
 
-export default function SubscriptionsPage() {
+function SubscriptionsContent() {
   const [state, setState] = useState<PageState>("loading");
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -152,5 +153,13 @@ export default function SubscriptionsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function SubscriptionsPage() {
+  return (
+    <AuthGuard>
+      <SubscriptionsContent />
+    </AuthGuard>
   );
 }

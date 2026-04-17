@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/layout/Navbar";
+import { AuthProvider } from "@/lib/auth/auth-context";
 
 const geist = Geist({ subsets: ["latin"] });
 
@@ -18,8 +19,10 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body className={`${geist.className} bg-gray-50 text-gray-900 antialiased`}>
-        <Navbar />
-        <main className="max-w-2xl mx-auto px-4 py-6">{children}</main>
+        <AuthProvider>
+          <Navbar />
+          <main className="max-w-2xl mx-auto px-4 py-6">{children}</main>
+        </AuthProvider>
       </body>
     </html>
   );

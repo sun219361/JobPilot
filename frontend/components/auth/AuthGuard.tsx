@@ -7,8 +7,13 @@
  *
  * 동작:
  *  - authState === "loading"         → 스켈레톤 표시 (초기 복원 대기)
- *  - authState === "unauthenticated" → /login 으로 리다이렉트
+ *  - authState === "unauthenticated" → 스켈레톤 유지하면서 /login 리다이렉트
+ *                                      (null 반환 시 빈 화면 깜빡임 방지)
  *  - authState === "authenticated"   → children 렌더링
+ *
+ * [QA 수정] unauthenticated 상태에서 null 대신 스켈레톤을 유지하고,
+ * useEffect에서 리다이렉트를 트리거한다.
+ * 이렇게 하면 loading → unauthenticated 전환 시 화면이 깜빡이지 않는다.
  *
  * 사용법:
  *  export default function ProtectedPage() {
@@ -26,7 +31,7 @@ import { useAuth } from "@/lib/auth/use-auth";
 
 interface AuthGuardProps {
   children: React.ReactNode;
-  /** 로그인 후 돌아올 경로 (기본: 현재 경로) */
+  /** 리다이렉트 목적지 (기본: /login) */
   redirectTo?: string;
 }
 
@@ -40,14 +45,10 @@ export function AuthGuard({ children, redirectTo = "/login" }: AuthGuardProps) {
     }
   }, [authState, redirectTo, router]);
 
-  // 초기 복원 중: 스켈레톤 표시
-  if (authState === "loading") {
+  // loading 중이거나 아직 unauthenticated 리다이렉트가 실행되기 전:
+  // 스켈레톤을 표시한다. null을 반환하면 빈 화면이 순간 보여 깜빡임이 생긴다.
+  if (authState === "loading" || authState === "unauthenticated") {
     return <AuthLoadingSkeleton />;
-  }
-
-  // 미로그인: 리다이렉트 트리거 후 빈 화면 (깜빡임 방지)
-  if (authState === "unauthenticated") {
-    return null;
   }
 
   // 로그인 완료: 실제 콘텐츠 렌더링

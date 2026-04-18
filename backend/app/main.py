@@ -50,9 +50,11 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         error = detail
     else:
         error = {"code": "HTTP_ERROR", "message": str(detail)}
+    # HTTPException에 headers(예: WWW-Authenticate)가 있으면 그대로 전달
     return JSONResponse(
         status_code=exc.status_code,
         content={"success": False, "data": None, "error": error},
+        headers=dict(exc.headers) if exc.headers else None,
     )
 
 

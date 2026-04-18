@@ -7,7 +7,7 @@
 
 설계:
 - ACCESS_TOKEN만 구현 (refresh token 제외)
-- payload: sub (user_id str), exp, type="access"
+- payload: sub (user_id str), exp, iat, type="access"
 - 비밀번호: bcrypt, rounds 기본값 사용
 """
 
@@ -35,78 +35,6 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         plain_password.encode("utf-8"),
         hashed_password.encode("utf-8"),
     )
-
-
-# ── JWT 토큰 ──────────────────────────────────────────────────────────────
-
-def create_access_token(
-    subject: int | str,
-    extra_claims: dict[str, Any] | None = None,
-) -> str:
-    """JWT access token을 생성한다.
-
-    Args:
-        subject: user_id (str 또는 int — payload의 sub로 저장)
-        extra_claims: 추가로 포함할 payload 키-값 (선택)
-
-    Returns:
-        JWT 문자열 (Bearer token 값)
-    """
-    now = datetime.now(tz=timezone.utc)
-    expire = now + timedelta(minutes=settings.access_token_expire_minutes)
-
-    payload: dict[str, Any] = {
-        "sub": str(subject),
-        "exp": expire,
-        "iat": now,
-        "type": "access",
-    }
-    if extra_claims:
-        payload.update(extra_claims)
-
-    return jwt.encode(payload, settings.secret_key, algorithm=settings.jwt_algorithm)
-
-
-def decode_access_token(token: str) -> dict[str, Any]:
-    """JWT access token을 디코딩하고 payload를 반환한다.
-
-    Args:
-        token: Bearer token 문자열
-
-    Returns:
-        decoded payload dict
-
-    Raises:
-        JWTError: 토큰이 유효하지 않거나 만료된 경우
-    """
-    return jwt.decode(
-        token,
-        settings.secret_key,
-        algorithms=[settings.jwt_algorithm],
-    )
-
-
-def extract_user_id(token: str) -> int:
-    """토큰에서 user_id(sub)를 추출한다.
-
-    Args:
-        token: Bearer token 문자열
-
-    Returns:
-        user_id (int)
-
-    Raises:
-        JWTError: 토큰 유효성 오류
-        ValueError: sub가 없거나 int 변환 실패
-    """
-    payload = decode_access_token(token)
-    sub = payload.get("sub")
-    if sub is None:
-        raise ValueError("token payload에 sub가 없습니다.")
-    token_type = payload.get("type")
-    if token_type != "access":
-        raise ValueError(f"잘못된 token type: {token_type}")
-    return int(sub)
 
 
 # ── JWT 토큰 ──────────────────────────────────────────────────────────────

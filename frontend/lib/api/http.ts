@@ -26,6 +26,22 @@ export class NetworkError extends Error {
 }
 
 // ─────────────────────────────────────────────
+// 401 자동 로그아웃 이벤트
+//
+// http.ts는 AuthContext를 직접 import할 수 없다 (순환 참조).
+// 대신 CustomEvent("auth:logout")를 dispatch하고,
+// AuthProvider가 이를 수신해서 logout()을 호출한다.
+// ─────────────────────────────────────────────
+
+export const AUTH_LOGOUT_EVENT = "auth:logout";
+
+function dispatchLogout() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(AUTH_LOGOUT_EVENT));
+  }
+}
+
+// ─────────────────────────────────────────────
 // HTTP Client
 // ─────────────────────────────────────────────
 
@@ -38,6 +54,7 @@ interface FetchOptions extends RequestInit {
  * - API_CONFIG.BASE_URL 자동 추가
  * - 성공/실패 응답 파싱
  * - 에러 unwrap
+ * - 401: 토큰 제거 + auth:logout 이벤트 발생 (AuthProvider가 상태 초기화)
  */
 export async function httpClient<T>(
   endpoint: string,
@@ -93,12 +110,13 @@ export async function httpClient<T>(
   if (!json.success || json.error) {
     const error = json.error || { code: "UNKNOWN_ERROR", message: "알 수 없는 오류" };
 
-    // 401: 토큰 만료 → localStorage 정리 (자동 로그아웃 트리거)
+    // 401: 토큰 만료/무효 → 토큰 제거 + auth:logout 이벤트
+    // (페이지 리로드 없이 AuthProvider 상태를 직접 초기화)
     if (response.status === 401) {
       if (typeof window !== "undefined") {
         localStorage.removeItem("jobpilot_access_token");
-        // AuthProvider의 상태는 페이지 리로드로 자동 초기화됨
       }
+      dispatchLogout();
     }
 
     throw new ApiError(

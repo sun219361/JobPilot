@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.core.response import success_response, error_response, paginated_response
+from app.core.response import success_response, paginated_response
 from app.models.company import CompanyType
 from app.services.company_service import CompanyService
 
@@ -40,7 +40,10 @@ def get_company_news(
     service = CompanyService(db)
     detail = service.get_company_detail(company_id)
     if not detail:
-        return error_response("COMPANY_NOT_FOUND", "해당 기업을 찾을 수 없습니다.")
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "COMPANY_NOT_FOUND", "message": "해당 기업을 찾을 수 없습니다."},
+        )
 
     items, total = service.get_company_news(company_id, limit=limit, offset=offset)
     return paginated_response(
@@ -69,7 +72,10 @@ def get_company_jobs(
     service = CompanyService(db)
     detail = service.get_company_detail(company_id)
     if not detail:
-        return error_response("COMPANY_NOT_FOUND", "해당 기업을 찾을 수 없습니다.")
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "COMPANY_NOT_FOUND", "message": "해당 기업을 찾을 수 없습니다."},
+        )
 
     items, total = service.get_company_jobs(company_id, limit=limit, offset=offset)
     return paginated_response(
@@ -92,11 +98,12 @@ def get_company(
     - 기업 상세 응답에 공고 preview를 포함하면 캐싱 전략이 복잡해짐.
     - GET /api/v1/companies/{id}/jobs 를 별도로 호출하는 방식이
       클라이언트 선택적 로딩(lazy load)에 적합함.
-    - 향후 UX 개선이 필요하면 `include_jobs=true` 쿼리 파라미터로
-      선택적으로 preview를 포함할 수 있다.
     """
     service = CompanyService(db)
     detail = service.get_company_detail(company_id)
     if not detail:
-        return error_response("COMPANY_NOT_FOUND", "해당 기업을 찾을 수 없습니다.")
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "COMPANY_NOT_FOUND", "message": "해당 기업을 찾을 수 없습니다."},
+        )
     return success_response(detail.model_dump())

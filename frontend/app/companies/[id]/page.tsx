@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import type { CompanyDetail } from "@/lib/types";
 import { companyClient } from "@/lib/api/company-client";
 import { subscriptionClient } from "@/lib/api/subscription-client";
+import { useAuth } from "@/lib/auth/use-auth";
 import { PageHeader } from "@/components/common/PageHeader";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ErrorState } from "@/components/common/ErrorState";
@@ -16,7 +17,9 @@ type PageState = "loading" | "success" | "not-found" | "error";
 
 export default function CompanyDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const companyId = Number(params.id);
+  const { isAuthenticated } = useAuth();
 
   const [state, setState] = useState<PageState>("loading");
   const [company, setCompany] = useState<CompanyDetail | null>(null);
@@ -26,15 +29,13 @@ export default function CompanyDetailPage() {
   useEffect(() => {
     load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companyId]);
+  }, [companyId, isAuthenticated]);
 
   async function load() {
     setState("loading");
     try {
-      const [companyData, subsData] = await Promise.all([
-        companyClient.getById(companyId),
-        subscriptionClient.getList(),
-      ]);
+      // 기업 상세는 공개 API — 인증 불필요
+      const companyData = await companyClient.getById(companyId);
 
       if (!companyData) {
         setState("not-found");
@@ -42,7 +43,20 @@ export default function CompanyDetailPage() {
       }
 
       setCompany(companyData);
-      setIsSubscribed(subsData.some((s) => s.company.id === companyId));
+
+      // 구독 여부는 인증된 사용자에게만 조회 (비인증 시 false 유지)
+      if (isAuthenticated) {
+        try {
+          const subsData = await subscriptionClient.getList();
+          setIsSubscribed(subsData.some((s) => s.company.id === companyId));
+        } catch {
+          // 구독 조회 실패는 페이지 전체 에러로 처리하지 않음
+          setIsSubscribed(false);
+        }
+      } else {
+        setIsSubscribed(false);
+      }
+
       setState("success");
     } catch {
       setState("error");
@@ -50,6 +64,12 @@ export default function CompanyDetailPage() {
   }
 
   async function handleToggleSubscription() {
+    // 비인증 사용자가 관심기업 버튼 클릭 시 로그인 페이지로 유도
+    if (!isAuthenticated) {
+      router.push("/login");
+      return;
+    }
+
     if (!company) return;
     setIsToggling(true);
 
@@ -66,7 +86,7 @@ export default function CompanyDetailPage() {
         setIsSubscribed(true);
       }
     } catch {
-      // 에러는 무시 (toast가 있으면 표시 가능)
+      // 에러 무시 (향후 toast 추가 가능)
     } finally {
       setIsToggling(false);
     }

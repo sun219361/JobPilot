@@ -23,9 +23,6 @@ export default function HomePage() {
     <div className="space-y-8">
       {/* 히어로 */}
       <section className="rounded-xl bg-white border border-gray-200 px-6 py-10 text-center">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-xs font-medium text-blue-700 mb-4">
-          Phase 0 · Mock Data
-        </div>
         <h1 className="text-2xl font-bold text-gray-900 leading-tight">
           취업 준비, 매일 아침
           <br />
@@ -74,11 +71,10 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 안내 */}
-      <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3">
-        <p className="text-xs text-amber-700 leading-relaxed">
-          <strong>Phase 0 데모</strong> · 현재는 mock 데이터로 동작합니다. 
-          실제 뉴스·채용 수집 기능은 Phase 1에서 연결됩니다.
+      {/* 시작 안내 */}
+      <div className="rounded-lg bg-blue-50 border border-blue-100 px-4 py-3">
+        <p className="text-xs text-blue-700 leading-relaxed">
+          <strong>시작하기</strong> · 회원가입 후 관심기업을 등록하면 매일 아침 브리핑을 받아볼 수 있습니다.
         </p>
       </div>
     </div>
